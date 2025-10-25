@@ -6,6 +6,7 @@ public class Piece : MonoBehaviour
     public int y;
     public bool isWhite;
     public bool isKing = false;
+    public bool canMultiJump = false; // NEW: Track if this piece is in a multi-jump sequence
     
     public GameObject kingCrown;
     
@@ -31,7 +32,7 @@ public class Piece : MonoBehaviour
         
         dragOffset = transform.position - GetMouseWorldPos();
         
-        // NEW: Highlight valid moves when picking up the piece
+        // Highlight valid moves when picking up the piece
         board.HighlightValidMoves(x, y);
     }
     
@@ -50,7 +51,7 @@ public class Piece : MonoBehaviour
         if (gameManager.isWhiteTurn != isWhite)
         {
             transform.position = board.GetWorldPosition(x, y);
-            board.ClearHighlights(); // NEW: Clear highlights if invalid turn
+            board.ClearHighlights();
             return;
         }
         
@@ -63,14 +64,22 @@ public class Piece : MonoBehaviour
         {
             int oldX = x;
             int oldY = y;
+            bool wasJump = Mathf.Abs(newX - oldX) == 2;
+            
             board.MovePiece(x, y, newX, newY);
-            gameManager.EndTurn();
+            
+            // NEW: Only end turn if not in a multi-jump sequence
+            if (!canMultiJump)
+            {
+                gameManager.EndTurn();
+            }
+            // If canMultiJump is true, the player must continue jumping with this piece
         }
         else
         {
             // Invalid move, snap back
             transform.position = board.GetWorldPosition(x, y);
-            board.ClearHighlights(); // NEW: Clear highlights on invalid move
+            board.ClearHighlights();
         }
     }
     

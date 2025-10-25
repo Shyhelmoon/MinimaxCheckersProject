@@ -7,11 +7,11 @@ public class BoardManager : MonoBehaviour
     public GameObject blackPiecePrefab;
     public Material whiteTileMaterial;
     public Material blackTileMaterial;
-    public Material highlightMaterial; // NEW: Assign a bright material (green/yellow)
+    public Material highlightMaterial;
     
     private Piece[,] pieces = new Piece[8, 8];
     private GameObject[,] tiles = new GameObject[8, 8];
-    private Material[,] originalTileMaterials = new Material[8, 8]; // NEW: Store original materials
+    private Material[,] originalTileMaterials = new Material[8, 8];
     private Vector3 boardOffset = new Vector3(-4f, 0, -4f);
     private float tileSize = 1f;
     
@@ -33,7 +33,6 @@ public class BoardManager : MonoBehaviour
                 tile.transform.parent = transform;
                 tile.name = $"Tile_{x}_{y}";
                 
-                // Alternate colors
                 Material tileMaterial;
                 if ((x + y) % 2 == 0)
                     tileMaterial = whiteTileMaterial;
@@ -41,7 +40,7 @@ public class BoardManager : MonoBehaviour
                     tileMaterial = blackTileMaterial;
                 
                 tile.GetComponent<Renderer>().material = tileMaterial;
-                originalTileMaterials[x, y] = tileMaterial; // NEW: Store the original material
+                originalTileMaterials[x, y] = tileMaterial;
                 
                 tiles[x, y] = tile;
             }
@@ -90,10 +89,9 @@ public class BoardManager : MonoBehaviour
         return new Vector3(x * tileSize, 0.5f, y * tileSize) + boardOffset;
     }
     
-    // NEW: Highlight valid moves for a piece
     public void HighlightValidMoves(int startX, int startY)
     {
-        ClearHighlights(); // Clear any existing highlights first
+        ClearHighlights();
         
         Piece piece = pieces[startX, startY];
         if (piece == null) return;
@@ -111,7 +109,6 @@ public class BoardManager : MonoBehaviour
         }
     }
     
-    // NEW: Highlight a single tile
     void HighlightTile(int x, int y)
     {
         if (tiles[x, y] != null && highlightMaterial != null)
@@ -120,7 +117,6 @@ public class BoardManager : MonoBehaviour
         }
     }
     
-    // NEW: Clear all highlights
     public void ClearHighlights()
     {
         for (int x = 0; x < 8; x++)
@@ -187,6 +183,36 @@ public class BoardManager : MonoBehaviour
         return false;
     }
     
+    // NEW: Check if a piece can make a jump from its current position
+    public bool CanJumpFrom(int x, int y)
+    {
+        Piece piece = pieces[x, y];
+        if (piece == null) return false;
+        
+        // Check all four diagonal jump directions
+        int[] dx = { -2, -2, 2, 2 };
+        int[] dy = { -2, 2, -2, 2 };
+        
+        for (int i = 0; i < 4; i++)
+        {
+            int newX = x + dx[i];
+            int newY = y + dy[i];
+            
+            if (IsValidMove(x, y, newX, newY))
+            {
+                // Check if it's a jump (has a piece to capture in the middle)
+                int midX = (x + newX) / 2;
+                int midY = (y + newY) / 2;
+                if (pieces[midX, midY] != null && pieces[midX, midY].isWhite != piece.isWhite)
+                {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
+    }
+    
     public void MovePiece(int startX, int startY, int endX, int endY)
     {
         Piece piece = pieces[startX, startY];
@@ -197,9 +223,12 @@ public class BoardManager : MonoBehaviour
         piece.y = endY;
         piece.transform.position = GetWorldPosition(endX, endY);
         
+        bool wasJump = false;
+        
         // Check for jump
         if (Mathf.Abs(endX - startX) == 2)
         {
+            wasJump = true;
             int midX = (startX + endX) / 2;
             int midY = (startY + endY) / 2;
             Piece capturedPiece = pieces[midX, midY];
@@ -217,7 +246,19 @@ public class BoardManager : MonoBehaviour
             piece.BecomeKing();
         }
         
-        ClearHighlights(); // NEW: Clear highlights after move
+        // NEW: Check for multi-jump capability
+        if (wasJump && CanJumpFrom(endX, endY))
+        {
+            // Piece can continue jumping - highlight valid jumps
+            piece.canMultiJump = true;
+            HighlightValidMoves(endX, endY);
+        }
+        else
+        {
+            // No more jumps possible, clear highlights and end turn
+            piece.canMultiJump = false;
+            ClearHighlights();
+        }
     }
     
     public Piece GetPiece(int x, int y)
@@ -225,5 +266,66 @@ public class BoardManager : MonoBehaviour
         if (x < 0 || x >= 8 || y < 0 || y >= 8)
             return null;
         return pieces[x, y];
+    }
+    
+    // NEW: Win condition checking
+    public int CountPieces(bool isWhite)
+    {
+        int count = 0;
+        for (int x = 0; x < 8; x++)
+        {
+            for (int y = 0; y < 8; y++)
+            {
+                if (pieces[x, y] != null && pieces[x, y].isWhite == isWhite)
+                    count++;
+            }
+        }
+        return count;
+    }
+    
+    // NEW: Check if a player has any valid moves
+    public bool HasValidMoves(bool isWhite)
+    {
+        for (int startX = 0; startX < 8; startX++)
+        {
+            for (int startY = 0; startY < 8; startY++)
+            {
+                Piece piece = pieces[startX, startY];
+                if (piece != null && piece.isWhite == isWhite)
+                {
+                    // Check if this piece can move anywhere
+                    for (int endX = 0; endX < 8; endX++)
+                    {
+                        for (int endY = 0; endY < 8; endY++)
+                        {
+                            if (IsValidMove(startX, startY, endX, endY))
+                                return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+    
+    // NEW: Check for win condition
+    public string CheckWinCondition()
+    {
+        int whitePieces = CountPieces(true);
+        int blackPieces = CountPieces(false);
+        
+        // Win by elimination
+        if (whitePieces == 0)
+            return "Black";
+        if (blackPieces == 0)
+            return "White";
+        
+        // Win by no valid moves (stalemate = loss for player who can't move)
+        if (!HasValidMoves(true))
+            return "Black";
+        if (!HasValidMoves(false))
+            return "White";
+        
+        return null; // Game continues
     }
 }
