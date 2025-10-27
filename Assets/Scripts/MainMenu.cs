@@ -20,6 +20,13 @@ public class MainMenu : MonoBehaviour
     {
         if (sfxSource && clickSound)
             sfxSource.PlayOneShot(clickSound);
+
+        Invoke(nameof(LoadGame), 0.5f); // wait half a second
+    }
+
+    void LoadGame()
+    {
         SceneManager.LoadScene("SampleScene");
     }
+
 }
