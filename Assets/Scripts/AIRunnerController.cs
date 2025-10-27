@@ -4,11 +4,11 @@ using System.Collections.Generic;
 
 public class AIRunnerController : MonoBehaviour
 {
-    [SerializeField] private float gridSize = 0.3f;
+    [SerializeField] private float gridSize = 0.2f;
     [SerializeField] private float moveSpeed = 5f;
     [SerializeField] private Vector3 startPosition = new Vector3(-2.25f, 0.05f, 2.25f);
     [SerializeField] private Transform goalTransform;
-    [SerializeField] private Vector2Int gridWorldSize = new Vector2Int(20, 20);
+    [SerializeField] private Vector2Int gridWorldSize = new Vector2Int(30, 30);
     
     [Header("Goal Settings")]
     public UnityEvent onReachGoal;
@@ -27,6 +27,11 @@ public class AIRunnerController : MonoBehaviour
     {
         obstacleLayer = LayerMask.GetMask("Obstacle");
         goalLayer = LayerMask.GetMask("Goal");
+        
+        // DIAGNOSTIC: Log layer information
+        Debug.Log($"Obstacle Layer Mask: {obstacleLayer.value}");
+        Debug.Log($"Goal Layer Mask: {goalLayer.value}");
+        
         targetPosition = transform.localPosition;
         
         rb = GetComponent<Rigidbody>();
@@ -46,18 +51,25 @@ public class AIRunnerController : MonoBehaviour
         targetPosition = startPosition;
         isMoving = false;
         currentPathIndex = 0;
-        
+
         if (rb != null)
         {
             rb.useGravity = false;
             rb.isKinematic = true;
         }
+
+        // Start coroutine to initialize pathfinding after a delay
+        StartCoroutine(InitializePathfinding());
+    }
+    
+    System.Collections.IEnumerator InitializePathfinding()
+    {
+        // Wait for physics to fully update
+        yield return new WaitForFixedUpdate();
+        yield return new WaitForFixedUpdate(); // Wait 2 physics frames for safety
         
-        if (grid != null)
-        {
-            CreateGrid();
-            FindPath();
-        }
+        CreateGrid();
+        FindPath();
     }
 
     void Update()
@@ -74,17 +86,75 @@ public class AIRunnerController : MonoBehaviour
 
     void CreateGrid()
     {
+        // CRITICAL: Force physics to sync before checking collisions
+        Physics.SyncTransforms();
+        
+        // DIAGNOSTIC: Log maze parent information
+        Debug.Log($"=== GRID SETUP ===");
+        Debug.Log($"Maze Parent Position: {transform.parent.position}");
+        Debug.Log($"AI Position: {transform.position}");
+        Debug.Log($"AI Local Position: {transform.localPosition}");
+        Debug.Log($"Grid Size: {gridSize}, Grid World Size: {gridWorldSize.x}x{gridWorldSize.y}");
+        
         grid = new Node[gridWorldSize.x, gridWorldSize.y];
         Vector3 worldBottomLeft = transform.parent.position - Vector3.right * gridWorldSize.x / 2 * gridSize 
-                                                             - Vector3.forward * gridWorldSize.y / 2 * gridSize;
+                                                            - Vector3.forward * gridWorldSize.y / 2 * gridSize;
+        
+        Debug.Log($"Grid Bottom Left Corner: {worldBottomLeft}");
+        Debug.Log($"Grid Top Right Corner: {worldBottomLeft + Vector3.right * gridWorldSize.x * gridSize + Vector3.forward * gridWorldSize.y * gridSize}");
+        Debug.Log($"Grid Center: {transform.parent.position}");
 
         for (int x = 0; x < gridWorldSize.x; x++)
         {
             for (int y = 0; y < gridWorldSize.y; y++)
             {
                 Vector3 worldPoint = worldBottomLeft + Vector3.right * (x * gridSize + gridSize / 2) 
-                                                      + Vector3.forward * (y * gridSize + gridSize / 2);
-                bool walkable = !Physics.CheckSphere(worldPoint, gridSize * 0.4f, obstacleLayer);
+                                                    + Vector3.forward * (y * gridSize + gridSize / 2);
+                
+                // DIAGNOSTIC: Check if this is near the goal position
+                bool isGoalPosition = goalTransform != null && 
+                                      Vector3.Distance(worldPoint, goalTransform.position) < gridSize * 0.5f;
+                
+                // DIAGNOSTIC: Check if this is near the AI start position
+                bool isStartPosition = Vector3.Distance(worldPoint, transform.position) < gridSize * 0.5f;
+                
+                // Ignore trigger colliders, use larger radius to detect walls better
+                bool walkable = !Physics.CheckSphere(worldPoint, gridSize * 0.45f, obstacleLayer, QueryTriggerInteraction.Ignore);
+                
+                // DIAGNOSTIC: If this is the goal position, log what we're detecting
+                if (isGoalPosition)
+                {
+                    Debug.Log($"=== GOAL POSITION at grid ({x},{y}) ===");
+                    Debug.Log($"  Walkable: {walkable}");
+                    Debug.Log($"  World Point: {worldPoint}");
+                    Debug.Log($"  Goal Position: {goalTransform.position}");
+                    
+                    // Check what colliders are being detected
+                    Collider[] hits = Physics.OverlapSphere(worldPoint, gridSize * 0.4f);
+                    Debug.Log($"  Total colliders detected: {hits.Length}");
+                    foreach (var hit in hits)
+                    {
+                        Debug.Log($"    - {hit.gameObject.name}, Layer: {LayerMask.LayerToName(hit.gameObject.layer)}, IsTrigger: {hit.isTrigger}");
+                    }
+                }
+                
+                // DIAGNOSTIC: If this is the start position, log what we're detecting
+                if (isStartPosition)
+                {
+                    Debug.Log($"=== START POSITION at grid ({x},{y}) ===");
+                    Debug.Log($"  Walkable: {walkable}");
+                    Debug.Log($"  World Point: {worldPoint}");
+                    Debug.Log($"  AI Position: {transform.position}");
+                    
+                    // Check what colliders are being detected
+                    Collider[] hits = Physics.OverlapSphere(worldPoint, gridSize * 0.4f);
+                    Debug.Log($"  Total colliders detected: {hits.Length}");
+                    foreach (var hit in hits)
+                    {
+                        Debug.Log($"    - {hit.gameObject.name}, Layer: {LayerMask.LayerToName(hit.gameObject.layer)}, IsTrigger: {hit.isTrigger}");
+                    }
+                }
+                
                 grid[x, y] = new Node(walkable, worldPoint, x, y);
             }
         }
@@ -98,11 +168,27 @@ public class AIRunnerController : MonoBehaviour
             return;
         }
         
+        // DIAGNOSTIC: Check what's at the goal position
+        Collider[] allHits = Physics.OverlapSphere(goalTransform.position, gridSize * 0.5f);
+        Debug.Log($"=== FindPath: Objects at goal position ({goalTransform.position}) ===");
+        foreach (var hit in allHits)
+        {
+            Debug.Log($"  - {hit.gameObject.name}, Layer: {LayerMask.LayerToName(hit.gameObject.layer)}, IsTrigger: {hit.isTrigger}");
+        }
+        
         Node startNode = NodeFromWorldPoint(transform.position);
         Node targetNode = NodeFromWorldPoint(goalTransform.position);
 
-        Debug.Log($"Start Node: {(startNode != null ? $"({startNode.gridX},{startNode.gridY})" : "NULL")}");
-        Debug.Log($"Target Node: {(targetNode != null ? $"({targetNode.gridX},{targetNode.gridY})" : "NULL")}");
+        Debug.Log($"Start Node: {(startNode != null ? $"({startNode.gridX},{startNode.gridY}) walkable={startNode.walkable}" : "NULL")}");
+        Debug.Log($"Target Node: {(targetNode != null ? $"({targetNode.gridX},{targetNode.gridY}) walkable={targetNode.walkable}" : "NULL")}");
+        
+        // Show world position of the target node
+        if (targetNode != null)
+        {
+            Debug.Log($"Target Node World Position: {targetNode.worldPosition}");
+            Debug.Log($"Actual Goal Position: {goalTransform.position}");
+            Debug.Log($"Distance between node and goal: {Vector3.Distance(targetNode.worldPosition, goalTransform.position)}");
+        }
 
         if (startNode == null)
         {
