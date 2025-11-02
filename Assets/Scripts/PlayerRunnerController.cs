@@ -10,91 +10,83 @@ public class PlayerRunnerController : MonoBehaviour
     
     public UnityEvent onReachGoal;
     
-    private bool isMoving = false;
-    private Vector3 targetPosition;
     private LayerMask obstacleLayer;
     private LayerMask goalLayer;
+    private Vector3 moveDirection;
+    private Rigidbody rb;
 
     void Start()
     {
         obstacleLayer = LayerMask.GetMask("Obstacle");
         goalLayer = LayerMask.GetMask("Goal");
         transform.localPosition = startPosition;
-        targetPosition = transform.localPosition;
+        
+        rb = GetComponent<Rigidbody>();
     }
 
     void Update()
     {
-        if (!isMoving)
+        HandleInput();
+        CheckGoal();
+    }
+
+    void FixedUpdate()
+    {
+        if (moveDirection != Vector3.zero)
         {
-            HandleInput();
-        }
-        else
-        {
-            MoveToTarget();
+            MovePlayer();
         }
     }
+
     void OnEnable()
     {
         transform.localPosition = startPosition;
-        targetPosition = startPosition;
-        isMoving = false;
+        moveDirection = Vector3.zero;
+        
+        if (rb != null)
+        {
+            rb.useGravity = false;
+            rb.isKinematic = true;
+        }
     }
 
     void HandleInput()
     {
-        Vector3 direction = Vector3.zero;
+        moveDirection = Vector3.zero;
 
-        if (Input.GetKeyDown(KeyCode.W))
+        if (Input.GetKey(KeyCode.W))
         {
-            direction = Vector3.forward;
+            moveDirection = Vector3.forward;
         }
-        else if (Input.GetKeyDown(KeyCode.S))
+        else if (Input.GetKey(KeyCode.S))
         {
-            direction = Vector3.back;
+            moveDirection = Vector3.back;
         }
-        else if (Input.GetKeyDown(KeyCode.A))
+        else if (Input.GetKey(KeyCode.A))
         {
-            direction = Vector3.left;
+            moveDirection = Vector3.left;
         }
-        else if (Input.GetKeyDown(KeyCode.D))
+        else if (Input.GetKey(KeyCode.D))
         {
-            direction = Vector3.right;
-        }
-
-        if (direction != Vector3.zero)
-        {
-            TryMove(direction);
+            moveDirection = Vector3.right;
         }
     }
 
-    void TryMove(Vector3 direction)
+    void MovePlayer()
     {
-        Vector3 newPosition = transform.localPosition + direction * gridSize;
-        
-        // Cast a ray from current position to the target position
-        if (!Physics.Raycast(transform.localPosition, direction, raycastDistance, obstacleLayer))
+        // Check if there's an obstacle ahead
+        Vector3 worldDirection = transform.TransformDirection(moveDirection);
+        if (!Physics.Raycast(transform.position, worldDirection, raycastDistance, obstacleLayer))
         {
-            targetPosition = newPosition;
-            isMoving = true;
-        }
-    }
-
-    void MoveToTarget()
-    {
-        transform.localPosition = Vector3.MoveTowards(transform.localPosition, targetPosition, moveSpeed * Time.deltaTime);
-        
-        if (Vector3.Distance(transform.localPosition, targetPosition) < 0.001f)
-        {
-            transform.localPosition = targetPosition;
-            isMoving = false;
-            CheckGoal();
+            // Move in local space
+            Vector3 movement = moveDirection * moveSpeed * Time.fixedDeltaTime;
+            transform.localPosition += movement;
         }
     }
 
     void CheckGoal()
     {
-        Collider[] hits = Physics.OverlapSphere(transform.localPosition, 0.1f, goalLayer);
+        Collider[] hits = Physics.OverlapSphere(transform.position, gridSize * 0.5f, goalLayer);
         if (hits.Length > 0)
         {
             OnReachGoal();
@@ -105,9 +97,9 @@ public class PlayerRunnerController : MonoBehaviour
     {
         Debug.Log("Goal reached!");
         onReachGoal?.Invoke();
+        enabled = false; // Stop player movement after reaching goal
     }
 
-    // Trigger detection as alternative method
     void OnTriggerEnter(Collider other)
     {
         if (other.gameObject.layer == LayerMask.NameToLayer("Goal"))
