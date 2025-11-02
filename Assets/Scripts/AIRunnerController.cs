@@ -5,13 +5,25 @@ using System.Collections.Generic;
 public class AIRunnerController : MonoBehaviour
 {
     [SerializeField] private float gridSize = 0.2f;
-    public float moveSpeed = 1f;
-    [SerializeField] private Vector3 startPosition = new Vector3(-2.25f, 0.05f, 2.25f);
+    public float moveSpeed = 0.5f;
+    private Vector3 startPosition;
+    [SerializeField] private int runnerIndex; // 0, 1, or 2 to differentiate runners
     [SerializeField] private Transform goalTransform;
     [SerializeField] private Vector2Int gridWorldSize = new Vector2Int(30, 30);
     
+    [Header("Potential Fields")]
+    [SerializeField] private float attractiveForceWeight = 2f;
+    [SerializeField] private float obstacleRepulsionWeight = 0.5f;
+    [SerializeField] private float aiRepulsionWeight = 0.3f;
+    [SerializeField] private float aiRepulsionRange = 0.2f;
+    [SerializeField] private string aiTag = "AI";
+    
     [Header("Goal Settings")]
     public UnityEvent onReachGoal;
+    
+    private static int totalRunners = 3;
+    private static int runnersAtGoal = 0;
+    private static bool goalEventTriggered = false;
     
     private bool isMoving = false;
     private Vector3 targetPosition;
@@ -27,7 +39,27 @@ public class AIRunnerController : MonoBehaviour
     {
         obstacleLayer = LayerMask.GetMask("Obstacle");
         goalLayer = LayerMask.GetMask("Goal");
+
+        // Tag this AI so others can detect it
+        if (!gameObject.CompareTag(aiTag))
+        {
+            gameObject.tag = aiTag;
+        }
+
+        // Set start position based on runner index
+        Vector3[] startPositions = {
+            new Vector3(-2.25f, 0.05f, 2.15f), // Runner 0
+            new Vector3(-2.3f, 0.05f, 2.25f),  // Runner 1
+            new Vector3(-2.2f, 0.05f, 2.25f)   // Runner 2
+        };
+
+        if (runnerIndex >= 0 && runnerIndex < startPositions.Length)
+        {
+            startPosition = startPositions[runnerIndex];
+        }
         
+        Debug.Log($"Start position of {runnerIndex} is {startPosition}");
+
         targetPosition = transform.localPosition;
         
         rb = GetComponent<Rigidbody>();
@@ -42,11 +74,13 @@ public class AIRunnerController : MonoBehaviour
 
     void OnEnable()
     {
-        startPosition = new Vector3(-2.25f, 0.05f, 2.25f);
         transform.localPosition = startPosition;
         targetPosition = startPosition;
         isMoving = false;
         currentPathIndex = 0;
+
+        runnersAtGoal = 0;
+        goalEventTriggered = false;
 
         if (rb != null)
         {
@@ -111,9 +145,6 @@ public class AIRunnerController : MonoBehaviour
         Node startNode = NodeFromWorldPoint(transform.position);
         Node targetNode = NodeFromWorldPoint(goalTransform.position);
 
-        Debug.Log($"Start Node: {(startNode != null ? $"({startNode.gridX},{startNode.gridY}) walkable={startNode.walkable}" : "NULL")}");
-        Debug.Log($"Target Node: {(targetNode != null ? $"({targetNode.gridX},{targetNode.gridY}) walkable={targetNode.walkable}" : "NULL")}");
-
         if (startNode == null)
         {
             Debug.LogError("Start node is null! AI position: " + transform.position);
@@ -163,7 +194,6 @@ public class AIRunnerController : MonoBehaviour
 
             if (currentNode == targetNode)
             {
-                Debug.Log($"Path found in {iterations} iterations!");
                 RetracePath(startNode, targetNode);
                 return;
             }
@@ -202,8 +232,6 @@ public class AIRunnerController : MonoBehaviour
         }
         path.Reverse();
         currentPathIndex = 0;
-        
-        Debug.Log($"Path has {path.Count} nodes");
     }
 
     void MoveAlongPath()
@@ -216,20 +244,123 @@ public class AIRunnerController : MonoBehaviour
 
         targetPosition = localTarget;
         isMoving = true;
-        // Don't increment here - wait until we arrive at the target
     }
 
     void MoveToTarget()
     {
-        transform.localPosition = Vector3.MoveTowards(transform.localPosition, targetPosition, moveSpeed * Time.deltaTime);
+        // Calculate potential field forces
+        Vector3 potentialFieldForce = CalculatePotentialFieldForce();
         
-        if (Vector3.Distance(transform.localPosition, targetPosition) < 0.001f)
+        // Combine A* path following with potential field adjustments
+        Vector3 pathDirection = (targetPosition - transform.localPosition).normalized;
+        Vector3 adjustedDirection = (pathDirection * attractiveForceWeight + potentialFieldForce).normalized;
+        
+        // Move with adjusted direction
+        float distanceMoved = moveSpeed * Time.deltaTime;
+        
+        // Check if adjusted movement would hit an obstacle
+        Vector3 worldAdjustedDir = transform.TransformDirection(adjustedDirection);
+        bool adjustedPathBlocked = Physics.Raycast(transform.position, worldAdjustedDir, distanceMoved * 1.5f, obstacleLayer);
+        
+        Vector3 movement;
+        if (!adjustedPathBlocked)
+        {
+            // Use potential field adjusted direction
+            movement = adjustedDirection * distanceMoved;
+        }
+        else
+        {
+            // Fall back to pure A* path direction
+            Vector3 worldPathDir = transform.TransformDirection(pathDirection);
+            bool pathBlocked = Physics.Raycast(transform.position, worldPathDir, distanceMoved * 1.5f, obstacleLayer);
+            
+            if (!pathBlocked)
+            {
+                movement = pathDirection * distanceMoved;
+            }
+            else
+            {
+                // If both blocked, try to slide along wall
+                movement = Vector3.zero;
+                
+                // Try moving perpendicular to find opening
+                Vector3[] slideDirections = {
+                    Vector3.Cross(pathDirection, Vector3.up).normalized,
+                    Vector3.Cross(pathDirection, Vector3.down).normalized
+                };
+                
+                foreach (Vector3 slideDir in slideDirections)
+                {
+                    Vector3 worldSlideDir = transform.TransformDirection(slideDir);
+                    if (!Physics.Raycast(transform.position, worldSlideDir, distanceMoved * 1.5f, obstacleLayer))
+                    {
+                        movement = slideDir * distanceMoved * 0.5f; // Slower slide movement
+                        break;
+                    }
+                }
+            }
+        }
+        
+        transform.localPosition += movement;
+        
+        float distance = Vector3.Distance(transform.localPosition, targetPosition);
+        
+        // Check if close enough to target OR if stuck
+        if (distance < 0.15f || (movement.magnitude < 0.001f && distance < gridSize))
         {
             transform.localPosition = targetPosition;
             isMoving = false;
-            currentPathIndex++; // Only increment after arriving at target
+            currentPathIndex++;
             CheckGoal();
         }
+    }
+    
+    Vector3 CalculatePotentialFieldForce()
+    {
+        Vector3 totalForce = Vector3.zero;
+        
+        // Repulsive force from other AIs
+        GameObject[] otherAIs = GameObject.FindGameObjectsWithTag(aiTag);
+        foreach (GameObject otherAI in otherAIs)
+        {
+            if (otherAI == gameObject) continue; // Skip self
+            
+            float distance = Vector3.Distance(transform.position, otherAI.transform.position);
+            
+            if (distance < aiRepulsionRange && distance > 0.01f)
+            {
+                // Calculate repulsive direction (away from other AI)
+                Vector3 awayDirection = (transform.position - otherAI.transform.position).normalized;
+                
+                // Stronger repulsion when closer
+                float forceMagnitude = aiRepulsionWeight * (1f - distance / aiRepulsionRange);
+                
+                // Convert to local space
+                Vector3 localForce = transform.parent.InverseTransformDirection(awayDirection * forceMagnitude);
+                localForce.y = 0; // Keep on same plane
+                
+                totalForce += localForce;
+            }
+        }
+        
+        // Repulsive force from nearby obstacles
+        Collider[] nearbyObstacles = Physics.OverlapSphere(transform.position, gridSize * 2f, obstacleLayer);
+        foreach (Collider obstacle in nearbyObstacles)
+        {
+            float distance = Vector3.Distance(transform.position, obstacle.transform.position);
+            if (distance > 0.01f)
+            {
+                Vector3 awayDirection = (transform.position - obstacle.transform.position).normalized;
+                float forceMagnitude = obstacleRepulsionWeight / distance;
+                
+                Vector3 localForce = transform.parent.InverseTransformDirection(awayDirection * forceMagnitude);
+                localForce.y = 0;
+                
+                totalForce += localForce;
+            }
+        }
+        
+        return totalForce;
     }
 
     void CheckGoal()
@@ -237,23 +368,35 @@ public class AIRunnerController : MonoBehaviour
         Collider[] hits = Physics.OverlapSphere(transform.position, gridSize * 0.5f, goalLayer);
         if (hits.Length > 0)
         {
-            OnReachGoal();
+            OnRunnerReachGoal();
         }
     }
 
-    void OnReachGoal()
+    void OnRunnerReachGoal()
     {
-        Debug.Log("AI reached goal!");
-        onReachGoal?.Invoke();
+        Debug.Log($"AI Runner {runnerIndex} reached goal!");
+        
+        // Increment runners at goal
+        runnersAtGoal++;
+        
+        // Stop this runner's movement
         path = null;
-        enabled = false; // Stop the AI
+        enabled = false;
+        
+        // Check if all runners have reached the goal
+        if (runnersAtGoal >= totalRunners && !goalEventTriggered)
+        {
+            goalEventTriggered = true;
+            Debug.Log("All AI runners reached goal!");
+            onReachGoal?.Invoke();
+        }
     }
 
     void OnTriggerEnter(Collider other)
     {
         if (other.gameObject.layer == LayerMask.NameToLayer("Goal"))
         {
-            OnReachGoal();
+            OnRunnerReachGoal();
         }
     }
 

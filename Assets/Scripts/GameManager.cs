@@ -11,7 +11,9 @@ public class GameManager : MonoBehaviour
     public GameObject camera;
     public GameObject mazeRace;
     public PlayerRunnerController player;
-    public AIRunnerController opponent;
+    public AIRunnerController runner1;
+    public AIRunnerController runner2;
+    public AIRunnerController runner3;
     
     private int turnCount = 0;
     private BoardManager boardManager;
@@ -34,13 +36,17 @@ public class GameManager : MonoBehaviour
 
         mazeRace.SetActive(false);
         player.onReachGoal.AddListener(PlayerWonRace);
-        opponent.onReachGoal.AddListener(AIWonRace);
+        runner1.onReachGoal.AddListener(AIWonRace);
+        runner2.onReachGoal.AddListener(AIWonRace);
+        runner3.onReachGoal.AddListener(AIWonRace);
     }
     
     void OnDestroy()
     {
         player.onReachGoal.RemoveListener(PlayerWonRace);
-        opponent.onReachGoal.RemoveListener(AIWonRace);
+        runner1.onReachGoal.RemoveListener(AIWonRace);
+        runner2.onReachGoal.RemoveListener(AIWonRace);
+        runner3.onReachGoal.RemoveListener(AIWonRace);
     }
     
     public void EndTurn()
