@@ -11,6 +11,10 @@
 *.aab
 *.unitypackage
 *.app
+*.csproj
+*.sln
+*.user
 
 # Visual Studio cache
+
 .vs/
