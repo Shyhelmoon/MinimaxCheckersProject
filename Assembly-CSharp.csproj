@@ -62,6 +62,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Assets\Scripts\difficultySelect.cs" />
+    <Compile Include="Assets\Scripts\endScreen.cs" />
     <Compile Include="Assets\Scripts\CheckersAI.cs" />
     <Compile Include="Assets\Scripts\PersistentMusic.cs" />
     <Compile Include="Assets\Scripts\AIRunnerController.cs" />

@@ -108,6 +108,16 @@ public class GameManager : MonoBehaviour
         }
         
         Debug.Log(winner + " wins the game!");
+
+        //Load victory or defeat scenes based on winner
+        if (winner == "White")  //player
+        {
+            UnityEngine.SceneManagement.SceneManager.LoadScene("VictoryScene");
+        }
+        else if (winner == "Black")  //AI
+        {
+            UnityEngine.SceneManagement.SceneManager.LoadScene("DefeatScene");
+        }
     }
     
     public void ResetGame()
