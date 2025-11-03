@@ -37,6 +37,8 @@ public class AIRunnerController : MonoBehaviour
 
     void Start()
     {
+        moveSpeed = PlayerPrefs.GetFloat("AIMoveSpeed", moveSpeed);
+
         obstacleLayer = LayerMask.GetMask("Obstacle");
         goalLayer = LayerMask.GetMask("Goal");
 
