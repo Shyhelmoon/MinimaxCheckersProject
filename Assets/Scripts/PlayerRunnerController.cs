@@ -5,7 +5,6 @@ public class PlayerRunnerController : MonoBehaviour
 {
     [SerializeField] private float gridSize = 0.3f;
     [SerializeField] private float moveSpeed = 5f;
-    [SerializeField] private float raycastDistance = 0.25f;
     [SerializeField] private Vector3 startPosition = new Vector3(-2.25f, 0.05f, 2.25f);
     
     public UnityEvent onReachGoal;
@@ -29,11 +28,13 @@ public class PlayerRunnerController : MonoBehaviour
         {
             HandleInput();
         }
-        else
+        
+        if (isMoving)
         {
             MoveToTarget();
         }
     }
+    
     void OnEnable()
     {
         transform.localPosition = startPosition;
@@ -45,19 +46,20 @@ public class PlayerRunnerController : MonoBehaviour
     {
         Vector3 direction = Vector3.zero;
 
-        if (Input.GetKeyDown(KeyCode.W))
+        // Changed to GetKey for continuous movement
+        if (Input.GetKey(KeyCode.W))
         {
             direction = Vector3.forward;
         }
-        else if (Input.GetKeyDown(KeyCode.S))
+        else if (Input.GetKey(KeyCode.S))
         {
             direction = Vector3.back;
         }
-        else if (Input.GetKeyDown(KeyCode.A))
+        else if (Input.GetKey(KeyCode.A))
         {
             direction = Vector3.left;
         }
-        else if (Input.GetKeyDown(KeyCode.D))
+        else if (Input.GetKey(KeyCode.D))
         {
             direction = Vector3.right;
         }
@@ -72,8 +74,17 @@ public class PlayerRunnerController : MonoBehaviour
     {
         Vector3 newPosition = transform.localPosition + direction * gridSize;
         
-        // Cast a ray from current position to the target position
-        if (!Physics.Raycast(transform.localPosition, direction, raycastDistance, obstacleLayer))
+        // Convert to WORLD space for physics check (like the AI does)
+        Vector3 worldCheckPoint = transform.parent.TransformPoint(newPosition);
+        
+        // Use CheckSphere instead of Raycast (same as AI)
+        bool hitObstacle = Physics.CheckSphere(worldCheckPoint, gridSize * 0.4f, obstacleLayer, QueryTriggerInteraction.Ignore);
+        
+        // Debug
+        Debug.DrawLine(transform.position, worldCheckPoint, hitObstacle ? Color.red : Color.green, 0.5f);
+        Debug.Log(hitObstacle ? "BLOCKED!" : "Path clear");
+        
+        if (!hitObstacle)
         {
             targetPosition = newPosition;
             isMoving = true;
@@ -82,8 +93,13 @@ public class PlayerRunnerController : MonoBehaviour
 
     void MoveToTarget()
     {
-        transform.localPosition = Vector3.MoveTowards(transform.localPosition, targetPosition, moveSpeed * Time.deltaTime);
+        transform.localPosition = Vector3.MoveTowards(
+            transform.localPosition, 
+            targetPosition, 
+            moveSpeed * Time.deltaTime
+        );
         
+        // Check if we've reached the target
         if (Vector3.Distance(transform.localPosition, targetPosition) < 0.001f)
         {
             transform.localPosition = targetPosition;
@@ -94,7 +110,7 @@ public class PlayerRunnerController : MonoBehaviour
 
     void CheckGoal()
     {
-        Collider[] hits = Physics.OverlapSphere(transform.localPosition, 0.1f, goalLayer);
+        Collider[] hits = Physics.OverlapSphere(transform.localPosition, 0.15f, goalLayer);
         if (hits.Length > 0)
         {
             OnReachGoal();
@@ -103,11 +119,9 @@ public class PlayerRunnerController : MonoBehaviour
 
     void OnReachGoal()
     {
-        Debug.Log("Goal reached!");
         onReachGoal?.Invoke();
     }
 
-    // Trigger detection as alternative method
     void OnTriggerEnter(Collider other)
     {
         if (other.gameObject.layer == LayerMask.NameToLayer("Goal"))
