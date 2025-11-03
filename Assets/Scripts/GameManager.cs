@@ -123,11 +123,15 @@ public class GameManager : MonoBehaviour
         if (!gameOver)
         {
             Debug.Log("Maze triggered!");
+
             mazeRace.SetActive(true);
+            ResetMazeRace(); 
+
             camera.transform.position = new Vector3(0, 12, 0);
             camera.transform.rotation = Quaternion.Euler(90, 0, 0);
         }
     }
+
 
     void PlayerWonRace()
     {
@@ -144,4 +148,24 @@ public class GameManager : MonoBehaviour
         mazeRace.SetActive(false);
         // TODO: Add powerups when AI wins race?
     }
+
+    public void ResetMazeRace()
+    {
+        Debug.Log("Resetting Maze Race...");
+
+        var aiRunners = FindObjectsOfType<AIRunnerController>();
+        bool firstRunner = true;
+
+        foreach (var ai in aiRunners)
+        {
+            ai.ResetRunner(firstRunner);
+            firstRunner = false;
+        }
+
+        var player = FindObjectOfType<PlayerRunnerController>();
+        if (player != null)
+            player.ResetRunner();
+    }
+
+
 }

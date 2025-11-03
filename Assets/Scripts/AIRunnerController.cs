@@ -462,6 +462,45 @@ public class AIRunnerController : MonoBehaviour
             }
         }
     }
+
+    public void ResetRunner(bool isGlobalReset = false)
+    {
+        Debug.Log($"Resetting AI Runner {runnerIndex}");
+
+        // Re-enable this AI in case it was disabled after finishing
+        enabled = true;
+
+        // Reset position and movement state
+        transform.localPosition = startPosition;
+        targetPosition = startPosition;
+        isMoving = false;
+        currentPathIndex = 0;
+
+        // Reset physics
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+            rb.useGravity = false;
+            rb.isKinematic = true;
+        }
+
+        // Clear old path and regenerate
+        path = null;
+
+        // (Re)initialize grid and start moving again
+        CreateGrid();
+        StartCoroutine(InitializePathfinding());
+
+        // Only the first runner should reset the global counters
+        if (isGlobalReset)
+        {
+            runnersAtGoal = 0;
+            goalEventTriggered = false;
+        }
+    }
+
+
 }
 
 public class Node

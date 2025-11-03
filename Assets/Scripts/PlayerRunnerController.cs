@@ -107,4 +107,21 @@ public class PlayerRunnerController : MonoBehaviour
             OnReachGoal();
         }
     }
+
+    public void ResetRunner()
+    {
+        transform.localPosition = startPosition;
+        moveDirection = Vector3.zero;
+
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+            rb.useGravity = false;
+            rb.isKinematic = true;
+        }
+
+        enabled = true; // Re-enable movement if player had reached goal
+    }
+
 }
