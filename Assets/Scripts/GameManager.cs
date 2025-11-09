@@ -64,8 +64,8 @@ public class GameManager : MonoBehaviour
         
         UpdateTurnDisplay();
         
-        // Check for maze trigger every 3 turns (6 half-turns)
-        if (turnCount % 6 == 0)
+        // Check for maze trigger every 7 turns (14 half-turns)
+        if (turnCount % 14 == 0)
         {
             TriggerMaze();
         }
