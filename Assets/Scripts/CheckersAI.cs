@@ -58,17 +58,18 @@ public class CheckersAI : MonoBehaviour
             return null;
         
         Move bestMove = null;
-        float bestScore = float.NegativeInfinity;
+        float bestScore = float.PositiveInfinity; // Changed: AI (black) wants MINIMUM score
         
         foreach (Move move in possibleMoves)
         {
             // Simulate the move
             GameState simulatedState = SimulateMove(move, false);
             
-            // Evaluate using minimax
+            // Evaluate using minimax - after AI moves, it's white's turn (maximizing)
             float score = Minimax(simulatedState, difficulty - 1, float.NegativeInfinity, float.PositiveInfinity, true);
             
-            if (score > bestScore)
+            // Changed: AI wants the LOWEST score (most negative = best for black)
+            if (score < bestScore)
             {
                 bestScore = score;
                 bestMove = move;
