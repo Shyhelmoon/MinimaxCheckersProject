@@ -7,7 +7,8 @@ public class GameManager : MonoBehaviour
     public bool isWhiteTurn = true;
     public Text turnText;
     public Text winText;
-    public Button restartButton; // NEW: Add a restart button
+    public Text powerupText; // NEW: Display active powerup
+    public Button restartButton;
     public GameObject camera;
     public GameObject mazeRace;
     public PlayerRunnerController player;
@@ -18,6 +19,12 @@ public class GameManager : MonoBehaviour
     private int turnCount = 0;
     private BoardManager boardManager;
     private bool gameOver = false;
+    
+    // NEW: Powerup system
+    private bool hasExtraTurn = false;
+    private bool hasProtectedPiece = false;
+    private int protectedPieceX = -1;
+    private int protectedPieceY = -1;
 
     void Start()
     {
@@ -26,12 +33,14 @@ public class GameManager : MonoBehaviour
 
         if (winText != null)
             winText.gameObject.SetActive(false);
+            
+        if (powerupText != null)
+            powerupText.gameObject.SetActive(false);
 
-        // NEW: Hide restart button at start
         if (restartButton != null)
         {
             restartButton.gameObject.SetActive(false);
-            restartButton.onClick.AddListener(ResetGame); // Add click listener
+            restartButton.onClick.AddListener(ResetGame);
         }
 
         mazeRace.SetActive(false);
@@ -56,6 +65,16 @@ public class GameManager : MonoBehaviour
         if (winner != null)
         {
             GameOver(winner);
+            return;
+        }
+        
+        // NEW: Check for extra turn powerup
+        if (hasExtraTurn && isWhiteTurn) // Only player gets extra turn
+        {
+            hasExtraTurn = false;
+            UpdatePowerupDisplay("Extra Turn Used!");
+            Invoke("ClearPowerupDisplay", 2f);
+            // Don't change turn, player goes again
             return;
         }
         
@@ -86,6 +105,23 @@ public class GameManager : MonoBehaviour
         }
     }
     
+    void UpdatePowerupDisplay(string message)
+    {
+        if (powerupText != null)
+        {
+            powerupText.text = message;
+            powerupText.gameObject.SetActive(true);
+        }
+    }
+    
+    void ClearPowerupDisplay()
+    {
+        if (powerupText != null)
+        {
+            powerupText.gameObject.SetActive(false);
+        }
+    }
+    
     void GameOver(string winner)
     {
         gameOver = true;
@@ -101,7 +137,6 @@ public class GameManager : MonoBehaviour
             turnText.text = "Game Over!";
         }
         
-        // NEW: Show restart button
         if (restartButton != null)
         {
             restartButton.gameObject.SetActive(true);
@@ -109,12 +144,11 @@ public class GameManager : MonoBehaviour
         
         Debug.Log(winner + " wins the game!");
 
-        //Load victory or defeat scenes based on winner
-        if (winner == "White")  //player
+        if (winner == "White")
         {
             UnityEngine.SceneManagement.SceneManager.LoadScene("VictoryScene");
         }
-        else if (winner == "Black")  //AI
+        else if (winner == "Black")
         {
             UnityEngine.SceneManagement.SceneManager.LoadScene("DefeatScene");
         }
@@ -122,7 +156,6 @@ public class GameManager : MonoBehaviour
     
     public void ResetGame()
     {
-        // Reload the current scene to reset everything
         UnityEngine.SceneManagement.SceneManager.LoadScene(
             UnityEngine.SceneManagement.SceneManager.GetActiveScene().name
         );
@@ -142,13 +175,14 @@ public class GameManager : MonoBehaviour
         }
     }
 
-
     void PlayerWonRace()
     {
         camera.transform.position = new Vector3(0, 12, -5);
         camera.transform.rotation = Quaternion.Euler(60, 0, 0);
         mazeRace.SetActive(false);
-        // TODO: Add powerups when player wins race
+        
+        // NEW: Grant random powerup
+        GrantRandomPowerup();
     }
     
     void AIWonRace()
@@ -156,7 +190,9 @@ public class GameManager : MonoBehaviour
         camera.transform.position = new Vector3(0, 12, -5);
         camera.transform.rotation = Quaternion.Euler(60, 0, 0);
         mazeRace.SetActive(false);
-        // TODO: Add powerups when AI wins race?
+        
+        // NEW: Grant AI a random powerup (optional)
+        // GrantAIPowerup();
     }
 
     public void ResetMazeRace()
@@ -176,6 +212,161 @@ public class GameManager : MonoBehaviour
         if (player != null)
             player.ResetRunner();
     }
-
-
+    
+    // NEW: Powerup system
+    void GrantRandomPowerup()
+    {
+        int powerupChoice = Random.Range(0, 5);
+        
+        switch (powerupChoice)
+        {
+            case 0:
+                GrantExtraTurn();
+                break;
+            case 1:
+                GrantKingUpgrade();
+                break;
+            case 2:
+                GrantRemoveOpponentPiece();
+                break;
+            case 3:
+                GrantProtectPiece();
+                break;
+            case 4:
+                GrantForceOpponentSkip();
+                break;
+        }
+    }
+    
+    // Powerup 1: Extra Turn
+    void GrantExtraTurn()
+    {
+        hasExtraTurn = true;
+        UpdatePowerupDisplay("Powerup: Extra Turn!");
+        Debug.Log("Player gained Extra Turn powerup!");
+    }
+    
+    // Powerup 2: Upgrade Random Piece to King
+    void GrantKingUpgrade()
+    {
+        // Find all non-king white pieces
+        System.Collections.Generic.List<Piece> eligiblePieces = new System.Collections.Generic.List<Piece>();
+        
+        for (int x = 0; x < 8; x++)
+        {
+            for (int y = 0; y < 8; y++)
+            {
+                Piece piece = boardManager.GetPiece(x, y);
+                if (piece != null && piece.isWhite && !piece.isKing)
+                {
+                    eligiblePieces.Add(piece);
+                }
+            }
+        }
+        
+        if (eligiblePieces.Count > 0)
+        {
+            Piece randomPiece = eligiblePieces[Random.Range(0, eligiblePieces.Count)];
+            randomPiece.BecomeKing();
+            UpdatePowerupDisplay("Powerup: Random Piece Promoted to King!");
+            Debug.Log("Player piece upgraded to king!");
+        }
+        else
+        {
+            // Fallback to extra turn if no eligible pieces
+            GrantExtraTurn();
+        }
+    }
+    
+    // Powerup 3: Remove Random Opponent Piece
+    void GrantRemoveOpponentPiece()
+    {
+        // Find all black pieces
+        System.Collections.Generic.List<Piece> blackPieces = new System.Collections.Generic.List<Piece>();
+        
+        for (int x = 0; x < 8; x++)
+        {
+            for (int y = 0; y < 8; y++)
+            {
+                Piece piece = boardManager.GetPiece(x, y);
+                if (piece != null && !piece.isWhite)
+                {
+                    blackPieces.Add(piece);
+                }
+            }
+        }
+        
+        if (blackPieces.Count > 0)
+        {
+            Piece randomPiece = blackPieces[Random.Range(0, blackPieces.Count)];
+            boardManager.RemovePiece(randomPiece.x, randomPiece.y);
+            UpdatePowerupDisplay("Powerup: Opponent Piece Removed!");
+            Debug.Log("Random AI piece removed!");
+        }
+    }
+    
+    // Powerup 4: Protect One Piece from Capture (one time)
+    void GrantProtectPiece()
+    {
+        // Find all white pieces
+        System.Collections.Generic.List<Piece> whitePieces = new System.Collections.Generic.List<Piece>();
+        
+        for (int x = 0; x < 8; x++)
+        {
+            for (int y = 0; y < 8; y++)
+            {
+                Piece piece = boardManager.GetPiece(x, y);
+                if (piece != null && piece.isWhite)
+                {
+                    whitePieces.Add(piece);
+                }
+            }
+        }
+        
+        if (whitePieces.Count > 0)
+        {
+            Piece randomPiece = whitePieces[Random.Range(0, whitePieces.Count)];
+            protectedPieceX = randomPiece.x;
+            protectedPieceY = randomPiece.y;
+            hasProtectedPiece = true;
+            
+            // Visual indicator (optional - you could add a shield effect)
+            randomPiece.gameObject.transform.localScale *= 1.2f;
+            
+            UpdatePowerupDisplay("Powerup: One Piece Protected!");
+            Debug.Log($"Piece at ({protectedPieceX}, {protectedPieceY}) is protected!");
+        }
+    }
+    
+    // Powerup 5: Force Opponent to Skip Next Turn
+    void GrantForceOpponentSkip()
+    {
+        // This will skip the AI's next turn
+        isWhiteTurn = true; // Keep it white's turn
+        UpdatePowerupDisplay("Powerup: Opponent Skips Next Turn!");
+        Debug.Log("AI will skip next turn!");
+        
+        // We need to do an extra turn switch to actually skip
+        Invoke("SkipAITurn", 1.5f);
+    }
+    
+    void SkipAITurn()
+    {
+        // Just stay on white's turn
+        UpdateTurnDisplay();
+        ClearPowerupDisplay();
+    }
+    
+    // Method to check if a piece is protected
+    public bool IsPieceProtected(int x, int y)
+    {
+        if (hasProtectedPiece && x == protectedPieceX && y == protectedPieceY)
+        {
+            hasProtectedPiece = false; // Use up the protection
+            UpdatePowerupDisplay("Protected Piece Saved!");
+            Invoke("ClearPowerupDisplay", 2f);
+            return true;
+        }
+        return false;
+    }
 }

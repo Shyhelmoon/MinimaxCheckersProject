@@ -5,7 +5,7 @@ using System.Collections.Generic;
 public class AIRunnerController : MonoBehaviour
 {
     [SerializeField] private float gridSize = 0.2f;
-    public float moveSpeed = 0.5f;
+    public float moveSpeed = 0.2f;
     private Vector3 startPosition;
     [SerializeField] private int runnerIndex; // 0, 1, or 2 to differentiate runners
     [SerializeField] private Transform goalTransform;

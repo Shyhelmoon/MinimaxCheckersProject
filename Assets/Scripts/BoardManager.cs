@@ -46,7 +46,7 @@ public class BoardManager : MonoBehaviour
             }
         }
     }
-    
+
     void SpawnAllPieces()
     {
         // Spawn white pieces (bottom)
@@ -58,7 +58,7 @@ public class BoardManager : MonoBehaviour
                     SpawnPiece(x, y, true);
             }
         }
-        
+
         // Spawn black pieces (top)
         for (int y = 5; y < 8; y++)
         {
@@ -67,6 +67,20 @@ public class BoardManager : MonoBehaviour
                 if ((x + y) % 2 == 1)
                     SpawnPiece(x, y, false);
             }
+        }
+    }
+    
+
+    public void RemovePiece(int x, int y)
+    {
+        if (x < 0 || x >= 8 || y < 0 || y >= 8)
+            return;
+            
+        Piece piece = pieces[x, y];
+        if (piece != null)
+        {
+            pieces[x, y] = null;
+            Destroy(piece.gameObject);
         }
     }
     
@@ -234,10 +248,20 @@ public class BoardManager : MonoBehaviour
             Piece capturedPiece = pieces[midX, midY];
             
             if (capturedPiece != null)
+        { //For optional powerup.
+            // NEW: Check if piece is protected
+            GameManager gm = FindObjectOfType<GameManager>();
+            if (gm != null && gm.IsPieceProtected(midX, midY))
+            {
+                // Piece is protected, don't capture it
+                Debug.Log("Piece protected from capture!");
+            }
+            else
             {
                 pieces[midX, midY] = null;
                 Destroy(capturedPiece.gameObject);
             }
+        }
         }
         
         // Check for king promotion
