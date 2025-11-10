@@ -60,6 +60,7 @@
     <Compile Include="Assets\TutorialInfo\Scripts\Readme.cs" />
     <Compile Include="Assets\Scripts\Piece.cs" />
     <Compile Include="Assets\Scripts\GameManager.cs" />
+    <Compile Include="Assets\Scripts\muteButtonHandler.cs" />
     <Compile Include="Assets\Scripts\splash.cs" />
     <Compile Include="Assets\Scripts\BoardManager.cs" />
   </ItemGroup>
