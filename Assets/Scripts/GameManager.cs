@@ -26,6 +26,9 @@ public class GameManager : MonoBehaviour
     private int protectedPieceX = -1;
     private int protectedPieceY = -1;
 
+    // AI powerups
+    private bool hasAIExtraTurn = false;
+
     void Start()
     {
         boardManager = FindObjectOfType<BoardManager>();
@@ -68,13 +71,21 @@ public class GameManager : MonoBehaviour
             return;
         }
         
-        // NEW: Check for extra turn powerup
-        if (hasExtraTurn && isWhiteTurn) // Only player gets extra turn
+        // Check for player extra turn powerup
+        if (hasExtraTurn && isWhiteTurn)
         {
             hasExtraTurn = false;
             UpdatePowerupDisplay("Extra Turn Used!");
             Invoke("ClearPowerupDisplay", 2f);
-            // Don't change turn, player goes again
+            return;
+        }
+        
+        // NEW: Check for AI extra turn powerup
+        if (hasAIExtraTurn && !isWhiteTurn)
+        {
+            hasAIExtraTurn = false;
+            UpdatePowerupDisplay("AI Used Extra Turn!");
+            Invoke("ClearPowerupDisplay", 2f);
             return;
         }
         
@@ -191,8 +202,11 @@ public class GameManager : MonoBehaviour
         camera.transform.rotation = Quaternion.Euler(60, 0, 0);
         mazeRace.SetActive(false);
         
-        // NEW: Grant AI a random powerup (optional)
-        // GrantAIPowerup();
+        // NEW: Grant AI extra turn
+        hasAIExtraTurn = true;
+        UpdatePowerupDisplay("AI Earned Extra Turn!");
+        Invoke("ClearPowerupDisplay", 2f);
+        Debug.Log("AI gained Extra Turn powerup!");
     }
 
     public void ResetMazeRace()
