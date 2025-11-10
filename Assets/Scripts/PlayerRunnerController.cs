@@ -42,12 +42,14 @@ public class PlayerRunnerController : MonoBehaviour
     {
         transform.localPosition = startPosition;
         moveDirection = Vector3.zero;
-        
+
         if (rb != null)
         {
             rb.useGravity = false;
             rb.isKinematic = true;
         }
+
+        ResetRunner();
     }
 
     void HandleInput()
@@ -97,7 +99,7 @@ public class PlayerRunnerController : MonoBehaviour
     {
         Debug.Log("Goal reached!");
         onReachGoal?.Invoke();
-        enabled = false; // Stop player movement after reaching goal
+        //enabled = false; // Stop player movement after reaching goal
     }
 
     void OnTriggerEnter(Collider other)
@@ -121,7 +123,7 @@ public class PlayerRunnerController : MonoBehaviour
             rb.isKinematic = true;
         }
 
-        enabled = true; // Re-enable movement if player had reached goal
+        //enabled = true; // Re-enable movement if player had reached goal
     }
 
 }

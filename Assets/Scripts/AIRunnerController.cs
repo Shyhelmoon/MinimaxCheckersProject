@@ -79,6 +79,8 @@ public class AIRunnerController : MonoBehaviour
         isMoving = false;
         currentPathIndex = 0;
 
+        ResetRunner();
+
         if (rb != null)
         {
             rb.useGravity = false;
@@ -142,9 +144,6 @@ public class AIRunnerController : MonoBehaviour
         Node startNode = NodeFromWorldPoint(transform.position);
         Node targetNode = NodeFromWorldPoint(goalTransform.position);
 
-        Debug.Log($"Start Node: {(startNode != null ? $"({startNode.gridX},{startNode.gridY}) walkable={startNode.walkable}" : "NULL")}");
-        Debug.Log($"Target Node: {(targetNode != null ? $"({targetNode.gridX},{targetNode.gridY}) walkable={targetNode.walkable}" : "NULL")}");
-
         if (startNode == null)
         {
             Debug.LogError("Start node is null! AI position: " + transform.position);
@@ -194,7 +193,6 @@ public class AIRunnerController : MonoBehaviour
 
             if (currentNode == targetNode)
             {
-                Debug.Log($"Path found in {iterations} iterations!");
                 RetracePath(startNode, targetNode);
                 return;
             }
@@ -233,8 +231,6 @@ public class AIRunnerController : MonoBehaviour
         }
         path.Reverse();
         currentPathIndex = 0;
-        
-        Debug.Log($"Path has {path.Count} nodes");
     }
 
     void MoveAlongPath()
@@ -246,7 +242,6 @@ public class AIRunnerController : MonoBehaviour
         targetPosition.y = startPosition.y;
 
         isMoving = true;
-        Debug.Log($"Moving to node {currentPathIndex}/{path.Count}, target: {targetPosition}");
     }
 
     void MoveToTarget()
@@ -314,7 +309,6 @@ public class AIRunnerController : MonoBehaviour
             transform.localPosition = targetPosition;
             isMoving = false;
             currentPathIndex++;
-            Debug.Log($"Arrived at node {currentPathIndex-1}, moving to next");
             CheckGoal();
         }
     }
@@ -374,18 +368,14 @@ public class AIRunnerController : MonoBehaviour
     }
 
     void OnRunnerReachGoal()
-    {
-        Debug.Log($"AI Runner {runnerIndex} reached goal!");
-        
+    {        
         // Increment runners at goal
         runnersAtGoal++;
         
         // Stop this runner's movement
         path = null;
         enabled = false;
-        
-        Debug.Log($"{runnersAtGoal}/{totalRunners} runners at goal");
-        
+                
         // Check if all runners have reached the goal
         if (runnersAtGoal >= totalRunners && !goalEventTriggered)
         {

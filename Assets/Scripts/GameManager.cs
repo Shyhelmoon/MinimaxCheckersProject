@@ -224,9 +224,10 @@ public class GameManager : MonoBehaviour
         runner1.SetActive(false);
         runner2.SetActive(false);
         runner3.SetActive(false);
-        
+
         // NEW: Grant random powerup
         GrantRandomPowerup();
+        ResetMazeRace();
     }
     
     void AIWonRace()
@@ -246,6 +247,7 @@ public class GameManager : MonoBehaviour
         UpdatePowerupDisplay("AI Earned Extra Turn!");
         Invoke("ClearPowerupDisplay", 2f);
         Debug.Log("AI gained Extra Turn powerup!");
+        ResetMazeRace();
     }
 
     public void ResetMazeRace()
@@ -261,9 +263,8 @@ public class GameManager : MonoBehaviour
             firstRunner = false;
         }
 
-        var player = FindObjectOfType<PlayerRunnerController>();
-        if (player != null)
-            player.ResetRunner();
+        if (playerScript != null)
+            playerScript.ResetRunner();
     }
     
     // NEW: Powerup system
