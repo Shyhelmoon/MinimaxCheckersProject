@@ -10,11 +10,17 @@ public class GameManager : MonoBehaviour
     public Text powerupText; // NEW: Display active powerup
     public Button restartButton;
     public GameObject camera;
-    public GameObject mazeRace;
-    public PlayerRunnerController player;
-    public AIRunnerController runner1;
-    public AIRunnerController runner2;
-    public AIRunnerController runner3;
+    public GameObject mazeRace1;
+    public GameObject mazeRace2;
+    public GameObject mazeRace3;
+    public GameObject playerRunner;
+    public GameObject runner1;
+    public GameObject runner2;
+    public GameObject runner3;
+    public PlayerRunnerController playerScript;
+    public AIRunnerController runner1Script;
+    public AIRunnerController runner2Script;
+    public AIRunnerController runner3Script;
     
     private int turnCount = 0;
     private BoardManager boardManager;
@@ -46,19 +52,25 @@ public class GameManager : MonoBehaviour
             restartButton.onClick.AddListener(ResetGame);
         }
 
-        mazeRace.SetActive(false);
-        player.onReachGoal.AddListener(PlayerWonRace);
-        runner1.onReachGoal.AddListener(AIWonRace);
-        runner2.onReachGoal.AddListener(AIWonRace);
-        runner3.onReachGoal.AddListener(AIWonRace);
+        mazeRace1.SetActive(false);
+        mazeRace2.SetActive(false);
+        mazeRace3.SetActive(false);
+        playerRunner.SetActive(false);
+        runner1.SetActive(false);
+        runner2.SetActive(false);
+        runner3.SetActive(false);
+        playerScript.onReachGoal.AddListener(PlayerWonRace);
+        runner1Script.onReachGoal.AddListener(AIWonRace);
+        runner2Script.onReachGoal.AddListener(AIWonRace);
+        runner3Script.onReachGoal.AddListener(AIWonRace);
     }
     
     void OnDestroy()
     {
-        player.onReachGoal.RemoveListener(PlayerWonRace);
-        runner1.onReachGoal.RemoveListener(AIWonRace);
-        runner2.onReachGoal.RemoveListener(AIWonRace);
-        runner3.onReachGoal.RemoveListener(AIWonRace);
+        playerScript.onReachGoal.RemoveListener(PlayerWonRace);
+        runner1Script.onReachGoal.RemoveListener(AIWonRace);
+        runner2Script.onReachGoal.RemoveListener(AIWonRace);
+        runner3Script.onReachGoal.RemoveListener(AIWonRace);
     }
     
     public void EndTurn()
@@ -178,8 +190,23 @@ public class GameManager : MonoBehaviour
         {
             Debug.Log("Maze triggered!");
 
-            mazeRace.SetActive(true);
-            ResetMazeRace(); 
+            int rand = Random.Range(0, 3);
+            switch (rand)
+            {
+                case 0:
+                    mazeRace1.SetActive(true);
+                    break;
+                case 1:
+                    mazeRace2.SetActive(true);
+                    break;
+                case 2:
+                    mazeRace3.SetActive(true);
+                    break;
+            }
+            playerRunner.SetActive(true);
+            runner1.SetActive(true);
+            runner2.SetActive(true);
+            runner3.SetActive(true);
 
             camera.transform.position = new Vector3(0, 12, 0);
             camera.transform.rotation = Quaternion.Euler(90, 0, 0);
@@ -190,7 +217,13 @@ public class GameManager : MonoBehaviour
     {
         camera.transform.position = new Vector3(0, 12, -5);
         camera.transform.rotation = Quaternion.Euler(60, 0, 0);
-        mazeRace.SetActive(false);
+        mazeRace1.SetActive(false);
+        mazeRace2.SetActive(false);
+        mazeRace3.SetActive(false);
+        playerRunner.SetActive(false);
+        runner1.SetActive(false);
+        runner2.SetActive(false);
+        runner3.SetActive(false);
         
         // NEW: Grant random powerup
         GrantRandomPowerup();
@@ -200,7 +233,13 @@ public class GameManager : MonoBehaviour
     {
         camera.transform.position = new Vector3(0, 12, -5);
         camera.transform.rotation = Quaternion.Euler(60, 0, 0);
-        mazeRace.SetActive(false);
+        mazeRace1.SetActive(false);
+        mazeRace2.SetActive(false);
+        mazeRace3.SetActive(false);
+        playerRunner.SetActive(false);
+        runner1.SetActive(false);
+        runner2.SetActive(false);
+        runner3.SetActive(false);
         
         // NEW: Grant AI extra turn
         hasAIExtraTurn = true;

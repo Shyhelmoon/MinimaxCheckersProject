@@ -6,7 +6,7 @@ public class PlayerRunnerController : MonoBehaviour
     [SerializeField] private float gridSize = 0.3f;
     [SerializeField] private float moveSpeed = 5f;
     [SerializeField] private float raycastDistance = 0.25f;
-    [SerializeField] private Vector3 startPosition = new Vector3(-2.25f, 0.05f, 2.25f);
+    private Vector3 startPosition = new Vector3(-5.25f, 1.05f, 1.75f);
     
     public UnityEvent onReachGoal;
     

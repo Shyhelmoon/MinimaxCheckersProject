@@ -5,17 +5,18 @@ using System.Collections.Generic;
 public class AIRunnerController : MonoBehaviour
 {
     [SerializeField] private float gridSize = 0.2f;
-    public float moveSpeed = 0.2f;
-    private Vector3 startPosition;
-    [SerializeField] private int runnerIndex; // 0, 1, or 2 to differentiate runners
+    public float moveSpeed = 2f;
+    private Vector3 startPosition; // Remove SerializeField so code controls it
+    [SerializeField] private int runnerIndex = 0; // 0, 1, or 2 to differentiate runners
     [SerializeField] private Transform goalTransform;
+    private Vector3 mazeParent = new Vector3(3f, 1f, -0.5f);
     [SerializeField] private Vector2Int gridWorldSize = new Vector2Int(30, 30);
     
     [Header("Potential Fields")]
-    [SerializeField] private float attractiveForceWeight = 2f;
+    [SerializeField] private float attractiveForceWeight = 1f;
     [SerializeField] private float obstacleRepulsionWeight = 0.5f;
-    [SerializeField] private float aiRepulsionWeight = 0.3f;
-    [SerializeField] private float aiRepulsionRange = 0.2f;
+    [SerializeField] private float aiRepulsionWeight = 2f;
+    [SerializeField] private float aiRepulsionRange = 0.9f;
     [SerializeField] private string aiTag = "AI";
     
     [Header("Goal Settings")]
@@ -24,6 +25,7 @@ public class AIRunnerController : MonoBehaviour
     private static int totalRunners = 3;
     private static int runnersAtGoal = 0;
     private static bool goalEventTriggered = false;
+    private static List<AIRunnerController> allRunners = new List<AIRunnerController>();
     
     private bool isMoving = false;
     private Vector3 targetPosition;
@@ -37,31 +39,15 @@ public class AIRunnerController : MonoBehaviour
 
     void Start()
     {
-        moveSpeed = PlayerPrefs.GetFloat("AIMoveSpeed", moveSpeed);
-
         obstacleLayer = LayerMask.GetMask("Obstacle");
         goalLayer = LayerMask.GetMask("Goal");
-
+        
         // Tag this AI so others can detect it
         if (!gameObject.CompareTag(aiTag))
         {
             gameObject.tag = aiTag;
         }
-
-        // Set start position based on runner index
-        Vector3[] startPositions = {
-            new Vector3(-2.25f, 0.05f, 2.15f), // Runner 0
-            new Vector3(-2.3f, 0.05f, 2.25f),  // Runner 1
-            new Vector3(-2.2f, 0.05f, 2.25f)   // Runner 2
-        };
-
-        if (runnerIndex >= 0 && runnerIndex < startPositions.Length)
-        {
-            startPosition = startPositions[runnerIndex];
-        }
         
-        Debug.Log($"Start position of {runnerIndex} is {startPosition}");
-
         targetPosition = transform.localPosition;
         
         rb = GetComponent<Rigidbody>();
@@ -76,13 +62,22 @@ public class AIRunnerController : MonoBehaviour
 
     void OnEnable()
     {
+        // Set start position based on runner index
+        Vector3[] startPositions = {
+            new Vector3(0.75f, 1.05f, 1.65f), // Runner 0
+            new Vector3(0.7f, 1.05f, 1.75f),  // Runner 1
+            new Vector3(0.8f, 1.05f, 1.75f)   // Runner 2
+        };
+        
+        if (runnerIndex >= 0 && runnerIndex < startPositions.Length)
+        {
+            startPosition = startPositions[runnerIndex];
+        }
+        
         transform.localPosition = startPosition;
         targetPosition = startPosition;
         isMoving = false;
         currentPathIndex = 0;
-
-        runnersAtGoal = 0;
-        goalEventTriggered = false;
 
         if (rb != null)
         {
@@ -119,8 +114,8 @@ public class AIRunnerController : MonoBehaviour
         Physics.SyncTransforms();
         
         grid = new Node[gridWorldSize.x, gridWorldSize.y];
-        Vector3 worldBottomLeft = transform.parent.position - Vector3.right * gridWorldSize.x / 2 * gridSize 
-                                                            - Vector3.forward * gridWorldSize.y / 2 * gridSize;
+        Vector3 worldBottomLeft = mazeParent - Vector3.right * gridWorldSize.x / 2 * gridSize 
+                                                       - Vector3.forward * gridWorldSize.y / 2 * gridSize;
 
         for (int x = 0; x < gridWorldSize.x; x++)
         {
@@ -146,6 +141,9 @@ public class AIRunnerController : MonoBehaviour
         
         Node startNode = NodeFromWorldPoint(transform.position);
         Node targetNode = NodeFromWorldPoint(goalTransform.position);
+
+        Debug.Log($"Start Node: {(startNode != null ? $"({startNode.gridX},{startNode.gridY}) walkable={startNode.walkable}" : "NULL")}");
+        Debug.Log($"Target Node: {(targetNode != null ? $"({targetNode.gridX},{targetNode.gridY}) walkable={targetNode.walkable}" : "NULL")}");
 
         if (startNode == null)
         {
@@ -196,6 +194,7 @@ public class AIRunnerController : MonoBehaviour
 
             if (currentNode == targetNode)
             {
+                Debug.Log($"Path found in {iterations} iterations!");
                 RetracePath(startNode, targetNode);
                 return;
             }
@@ -234,6 +233,8 @@ public class AIRunnerController : MonoBehaviour
         }
         path.Reverse();
         currentPathIndex = 0;
+        
+        Debug.Log($"Path has {path.Count} nodes");
     }
 
     void MoveAlongPath()
@@ -241,11 +242,11 @@ public class AIRunnerController : MonoBehaviour
         if (path == null || currentPathIndex >= path.Count) return;
 
         Node targetNode = path[currentPathIndex];
-        Vector3 localTarget = transform.parent.InverseTransformPoint(targetNode.worldPosition);
-        localTarget.y = startPosition.y;
+        targetPosition = targetNode.worldPosition;
+        targetPosition.y = startPosition.y;
 
-        targetPosition = localTarget;
         isMoving = true;
+        Debug.Log($"Moving to node {currentPathIndex}/{path.Count}, target: {targetPosition}");
     }
 
     void MoveToTarget()
@@ -313,6 +314,7 @@ public class AIRunnerController : MonoBehaviour
             transform.localPosition = targetPosition;
             isMoving = false;
             currentPathIndex++;
+            Debug.Log($"Arrived at node {currentPathIndex-1}, moving to next");
             CheckGoal();
         }
     }
@@ -337,11 +339,9 @@ public class AIRunnerController : MonoBehaviour
                 // Stronger repulsion when closer
                 float forceMagnitude = aiRepulsionWeight * (1f - distance / aiRepulsionRange);
                 
-                // Convert to local space
-                Vector3 localForce = transform.parent.InverseTransformDirection(awayDirection * forceMagnitude);
-                localForce.y = 0; // Keep on same plane
+                awayDirection.y = 0; // Keep on same plane
                 
-                totalForce += localForce;
+                totalForce += awayDirection * forceMagnitude;
             }
         }
         
@@ -355,10 +355,9 @@ public class AIRunnerController : MonoBehaviour
                 Vector3 awayDirection = (transform.position - obstacle.transform.position).normalized;
                 float forceMagnitude = obstacleRepulsionWeight / distance;
                 
-                Vector3 localForce = transform.parent.InverseTransformDirection(awayDirection * forceMagnitude);
-                localForce.y = 0;
+                awayDirection.y = 0;
                 
-                totalForce += localForce;
+                totalForce += awayDirection * forceMagnitude;
             }
         }
         
@@ -385,12 +384,22 @@ public class AIRunnerController : MonoBehaviour
         path = null;
         enabled = false;
         
+        Debug.Log($"{runnersAtGoal}/{totalRunners} runners at goal");
+        
         // Check if all runners have reached the goal
         if (runnersAtGoal >= totalRunners && !goalEventTriggered)
         {
             goalEventTriggered = true;
-            Debug.Log("All AI runners reached goal!");
-            onReachGoal?.Invoke();
+            Debug.Log("All AI runners reached goal! Invoking events...");
+            
+            // Invoke the event on all runners (in case listeners are on different instances)
+            foreach (AIRunnerController runner in allRunners)
+            {
+                if (runner != null && runner.onReachGoal != null)
+                {
+                    runner.onReachGoal.Invoke();
+                }
+            }
         }
     }
 
@@ -431,9 +440,9 @@ public class AIRunnerController : MonoBehaviour
     }
 
     Node NodeFromWorldPoint(Vector3 worldPosition)
-    {
-        Vector3 localPos = worldPosition - (transform.parent.position - Vector3.right * gridWorldSize.x / 2 * gridSize 
-                                                                      - Vector3.forward * gridWorldSize.y / 2 * gridSize);
+    {   
+        Vector3 localPos = worldPosition - (mazeParent - Vector3.right * gridWorldSize.x / 2 * gridSize 
+                                                                 - Vector3.forward * gridWorldSize.y / 2 * gridSize);
         
         int x = Mathf.RoundToInt(localPos.x / gridSize);
         int y = Mathf.RoundToInt(localPos.z / gridSize);
@@ -501,8 +510,6 @@ public class AIRunnerController : MonoBehaviour
             goalEventTriggered = false;
         }
     }
-
-
 }
 
 public class Node
